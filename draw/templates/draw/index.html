@@ -116,12 +116,20 @@
     var users = new Object();
     users[clientID] = myPath;
     
-    
+    // init display size
+    var display_size;
+    if (url.indexOf("large") > -1) {
+				display_size = "large";
+    }
+		else {
+      display_size = "small";
+    }
      
     // draw locally
     tool.onMouseMove = function (event) {
-      
-      myPath.add(event.point);
+      if(display_size === "small"){
+        myPath.add(event.point);        
+      }
       var point = {
         x: event.point.x,
         y: event.point.y
@@ -151,7 +159,7 @@
             update_userlist(msg);
             break;
           case "draw":
-            if(msg.id != clientID){
+            if(display_size === "large" && msg.id != clientID){
               path = users[msg.id];
               if(path){
                 p = JSON.parse(msg.text);
