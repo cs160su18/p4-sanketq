@@ -21,31 +21,46 @@
   </p>
 </body>
 <script>
+  
+    ////////HELPERS/////////
 
-    // setting up the canvas and one paper tool
-    var canvas = document.getElementById('myCanvas');
-    paper.setup(canvas);
-  
-    // setup path     
-    var tool = new paper.Tool();
-    var myPath = new paper.Path();
-    myPath.strokeColor = 'black';
-  
-    // getting the URL (you may want to use for Exercise 3)
-    var url = window.location.href;
-    
-    // init socket     
-    var socket = new WebSocket(
-        'ws://p4-sanketq-sanketq228645.codeanyapp.com:8765/');
-    
-    var clientID = generateUniqueID();
-    
     // generate 16bit id  
     function generateUniqueID(){
       var num_bits = 16;
-      return Math.floor(Math.random() * Math.pow(10, num_bits));
+      var id = Math.floor(Math.random() * Math.pow(10, num_bits));
+      return id.toString();
+    }
+  
+    // generate a hexadecimal string of a number between decimal min and decimal max     
+    function generateRandHex(min, max){
+      var rand_dec =  Math.round(Math.random() * (max - min) + min);
+      var hex_string = rand_dec.toString(16)
+      while(hex_string.length < 2){
+        hex_string += "0";
+      }
+      return hex_string;
+    }
+  
+    // generate random hex value
+    function generateRandomColor(){
+      var color = "#";
+      for(var i = 0; i < 3; i++){
+        color += generateRandHex(0, 255);
+      }
+      return color;
     }
     
+    function update_userlist(msg){
+      var user_list = Object.keys(users);
+      if(!user_list.includes(msg.id)){
+         var newPath = new paper.Path();
+         newPath.strokeColor = msg.text;
+         users[msg.id] = newPath;
+         console.log(msg.id + " added to users list!");
+      }
+          
+    }
+  
     // send message     
     function sendMessage(msg_type, msg_text="") {
       var msg = {
@@ -57,19 +72,51 @@
       // send       
       socket.send(JSON.stringify(msg));
     }
+  
     // message helpers
     function sendText(msg_text) {
       sendMessage("text", msg_text);
     }
   
     function sendConnect() {
-      sendMessage("connect");
+      sendMessage("connect", color);
+    }
+  
+    function sendAck() {
+      sendMessage("ack", color);
     }
   
     function sendDraw(point){
       sendMessage("draw", JSON.stringify(point));
     }
+  ////////END  HELPERS/////////
   
+  
+    // setting up the canvas and one paper tool
+    var canvas = document.getElementById('myCanvas');
+    paper.setup(canvas);
+  
+    // setup path     
+    var tool = new paper.Tool();
+    var color = generateRandomColor();
+    
+    
+    // getting the URL (you may want to use for Exercise 3)
+    var url = window.location.href;
+    
+    // init socket     
+    var socket = new WebSocket(
+        'ws://p4-sanketq-sanketq228645.codeanyapp.com:8765/');
+    
+    // init client     
+    var clientID = generateUniqueID();
+    var myPath = new paper.Path();
+    myPath.strokeColor = color;
+  
+    var users = new Object();
+    users[clientID] = myPath;
+    
+    
      
     // draw locally
     tool.onMouseMove = function (event) {
@@ -81,7 +128,6 @@
       };
       sendDraw(point);
     }
-
     //try sending a message
     socket.onopen = function (event) {
       sendConnect();
@@ -98,12 +144,20 @@
             break;
           case "connect":
             console.log(msg.id + " has connected!");
+            update_userlist(msg);
+            sendAck();
+            break;
+          case "ack":
+            update_userlist(msg);
             break;
           case "draw":
             if(msg.id != clientID){
-              p = JSON.parse(msg.text);
-              point = new paper.Point(p.x, p.y);
-              myPath.add(point);
+              path = users[msg.id];
+              if(path){
+                p = JSON.parse(msg.text);
+                point = new paper.Point(p.x, p.y);
+                path.add(point);
+              }
             }
             break;
       }
