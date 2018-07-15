@@ -17,20 +17,96 @@
 <body>
     <!-- You may change the dimensions of this canvas -->
     <canvas id="myCanvas" width="750px" height="750px"></canvas>
+    
+  </p>
 </body>
 <script>
 
     // setting up the canvas and one paper tool
     var canvas = document.getElementById('myCanvas');
     paper.setup(canvas);
+  
+    // setup path     
     var tool = new paper.Tool();
-
+    var myPath = new paper.Path();
+    myPath.strokeColor = 'black';
+  
     // getting the URL (you may want to use for Exercise 3)
     var url = window.location.href;
+    
+    // init socket     
+    var socket = new WebSocket(
+        'ws://p4-sanketq-sanketq228645.codeanyapp.com:8765/');
+    
+    var clientID = generateUniqueID();
+    
+    // generate 16bit id  
+    function generateUniqueID(){
+      var num_bits = 16;
+      return Math.floor(Math.random() * Math.pow(10, num_bits));
+    }
+    
+    // send message     
+    function sendMessage(msg_type, msg_text="") {
+      var msg = {
+        type: msg_type,
+        text: msg_text,
+        id:   clientID,
+        date: Date.now()
+      };
+      // send       
+      socket.send(JSON.stringify(msg));
+    }
+    // message helpers
+    function sendText(msg_text) {
+      sendMessage("text", msg_text);
+    }
+  
+    function sendConnect() {
+      sendMessage("connect");
+    }
+  
+    function sendDraw(point){
+      sendMessage("draw", JSON.stringify(point));
+    }
+  
+     
+    // draw locally
+    tool.onMouseMove = function (event) {
+      
+      myPath.add(event.point);
+      var point = {
+        x: event.point.x,
+        y: event.point.y
+      };
+      sendDraw(point);
+    }
 
-    // var socket = new WebSocket(
-    //     'ws://your url here:8765/');
-
-
+    //try sending a message
+    socket.onopen = function (event) {
+      sendConnect();
+    };
+  
+    socket.onmessage = function(event) {
+      var msg = JSON.parse(event.data);
+      var time = new Date(msg.date);
+      var timeStr = time.toLocaleTimeString();
+      
+      switch(msg.type) {
+          case "text":
+            console.log(msg.id + "(" + timeStr + ") : " + msg.text);
+            break;
+          case "connect":
+            console.log(msg.id + " has connected!");
+            break;
+          case "draw":
+            if(msg.id != clientID){
+              p = JSON.parse(msg.text);
+              point = new paper.Point(p.x, p.y);
+              myPath.add(point);
+            }
+            break;
+      }
+    }
 </script>
 </html>
