@@ -9,7 +9,8 @@
     <link rel="stylesheet" type="text/css" href="{% static 'draw/vendor/bootstrap/css/bootstrap.min.css' %}">
     <script type="text/javascript" src="{% static 'draw/vendor/jquery/jquery-3.3.1.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'draw/vendor/paper/paper-full.min.js' %}"></script>
-
+    <script type="text/javascript" src="{% static 'draw/vendor/hammer/hammer.min.js' %}"></script>
+  
     <style type="text/css">
     </style>
 
@@ -57,8 +58,12 @@
          newPath.strokeColor = msg.text;
          users[msg.id] = newPath;
          console.log(msg.id + " added to users list!");
-      }
-          
+      }     
+    }
+  
+    function update_color(msg){
+      users[msg.id].strokeColor = msg.text;
+      console.log("User" + msg.id + "has updated their color to " + msg.text);
     }
   
     // send message     
@@ -84,6 +89,10 @@
   
     function sendAck() {
       sendMessage("ack", color);
+    }
+  
+    function sendColorChange(new_color) {
+      sendMessage("color_change", new_color);
     }
   
     function sendDraw(point){
@@ -124,8 +133,16 @@
 		else {
       display_size = "small";
     }
-     
-    // draw locally
+  
+    var gamma = 0;
+  
+  
+    //Init Connection
+    socket.onopen = function (event) {
+      sendConnect();
+    };
+  
+    // Draw Event
     tool.onMouseMove = function (event) {
       if(display_size === "small"){
         myPath.add(event.point);        
@@ -136,11 +153,56 @@
       };
       sendDraw(point);
     }
-    //try sending a message
-    socket.onopen = function (event) {
-      sendConnect();
-    };
+    
+    // Device Orientation Event
+    if (window.DeviceOrientationEvent) {
+      console.log("device orientation activated");
+      window.addEventListener("deviceorientation", function(event) {
+        var new_gamma = event.gamma;
+        threshold = 10;
+        if(gamma + threshold <= new_gamma){
+          color =  generateRandomColor();
+          myPath.color = color;
+          sendColorChange(color);
+        }
+        gamma = new_gamma;
+      }, false);
+    }
+    
+    var prevX, prevY, prevZ;
+    threshold = 15;
   
+    // Device Motion Event 
+    if (window.DeviceMotionEvent) {
+      console.log("device motion activated");
+      window.addEventListener('devicemotion', function(event) {
+        var a = event.accelerationIncludingGravity;
+        //if its the first time, init prevXYZ
+        if ((prevX === null) && (prevY === null) && (prevZ === null)) {
+            prevX = a.x;
+            prevY = a.y;
+            lastZ = a.z;
+            return;
+        }
+      
+        //calculate deltas
+        var deltaX = Math.abs(prevX - a.x);
+        var deltaY = Math.abs(prevY - a.y);
+        var deltaZ = Math.abs(prevZ - a.z);
+       
+//      //if at least two of the deltas are above the threshold
+        if ((deltaX > threshold && (deltaY > threshold || deltaZ > threshold)) || (deltaY > threshold && deltaZ > threshold)) {
+            myPath.remove();
+        }
+
+        //set prevXYZ for next time
+        prevX = a.x;
+        prevY = a.y;
+        prevZ = a.z;
+      }, false);
+    }
+    
+
     socket.onmessage = function(event) {
       var msg = JSON.parse(event.data);
       var time = new Date(msg.date);
@@ -157,6 +219,9 @@
             break;
           case "ack":
             update_userlist(msg);
+            break;
+          case "color_change":
+            update_color(msg);
             break;
           case "draw":
             if(display_size === "large" && msg.id != clientID){
