@@ -1,0 +1,148 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>P4 Drawing</title>
+
+    <link rel="stylesheet" type="text/css" href="{% static 'draw/vendor/bootstrap/css/bootstrap.min.css' %}">
+    <script type="text/javascript" src="{% static 'draw/vendor/jquery/jquery-3.3.1.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'draw/vendor/paper/paper-full.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'draw/vendor/hammer/hammer.min.js' %}"></script>
+  
+    <style type="text/css">
+    </style>
+
+</head>
+<body>
+    <!-- You may change the dimensions of this canvas -->
+    <canvas id="myCanvas" width="750px" height="750px"></canvas>
+      hi
+  </p>
+</body>
+<script>
+  
+    ////////HELPERS/////////
+
+    // generate 16bit id  
+    function generateUniqueID(){
+      var num_bits = 16;
+      var id = Math.floor(Math.random() * Math.pow(10, num_bits));
+      return id.toString();
+    }
+  
+    // generate a hexadecimal string of a number between decimal min and decimal max     
+    function generateRandHex(min, max){
+      var rand_dec =  Math.round(Math.random() * (max - min) + min);
+      var hex_string = rand_dec.toString(16)
+      while(hex_string.length < 2){
+        hex_string += "0";
+      }
+      return hex_string;
+    }
+  
+    // generate random hex value
+    function generateRandomColor(){
+      var color = "#";
+      for(var i = 0; i < 3; i++){
+        color += generateRandHex(0, 255);
+      }
+      return color;
+    }
+  
+    function placePixel(x, y, rect_color){
+      x = Math.round(x / 10) * 10;
+      y = Math.round(y / 10) * 10;
+      var rect = new paper.Rectangle(new paper.Point(x,y),new paper.Size(10,10));
+      var rectPath = new paper.Path.Rectangle(rect);
+      rectPath.strokeColor = rect_color;
+      rectPath.fillColor = rect_color;
+      return rectPath;
+    }
+  
+    // send message     
+    function sendMessage(msg_type, msg_text="") {
+      var msg = {
+        type: msg_type,
+        text: msg_text,
+        id:   clientID,
+        date: Date.now()
+      };
+      // send       
+      socket.send(JSON.stringify(msg));
+    }
+  
+    // message helpers
+    function sendText(msg_text) {
+      sendMessage("text", msg_text);
+    }
+  
+    function sendConnect() {
+      sendMessage("connect", color);
+    }
+  
+    function sendPixel(point){
+      sendMessage("pixel", JSON.stringify(point));
+    }
+  ////////END  HELPERS/////////
+  
+  
+    // setting up the canvas and one paper tool
+    var canvas = document.getElementById('myCanvas');
+    paper.setup(canvas);
+  
+    // setup path     
+    var tool = new paper.Tool();
+    var color = generateRandomColor();
+    
+    
+    // getting the URL (you may want to use for Exercise 3)
+    var url = window.location.href;
+    
+    // init socket     
+    var socket = new WebSocket(
+        'ws://p4-sanketq-sanketq228645.codeanyapp.com:8765/');
+    
+    // init client     
+    var clientID = generateUniqueID();
+       
+    //Init Connection
+    socket.onopen = function (event) {
+      sendConnect();
+    };
+  
+    // Draw Event
+    tool.onClick = function (event) {      
+      var point = {
+        x: event.point.x,
+        y: event.point.y,
+        color: color
+      };
+      sendPixel(point);
+      placePixel(event.point.x, event.point.y, color);
+    }
+   
+
+    socket.onmessage = function(event) {
+      var msg = JSON.parse(event.data);
+      var time = new Date(msg.date);
+      var timeStr = time.toLocaleTimeString();
+      
+      switch(msg.type) {
+          case "text":
+            console.log(msg.id + "(" + timeStr + ") : " + msg.text);
+            break;
+          case "connect":
+            console.log(msg.id + " has connected!");
+            break;
+          case "pixel":
+            if(msg.id != clientID){
+                p = JSON.parse(msg.text);
+                placePixel(p.x, p.y, p.color);
+            }
+            break;
+      }
+    }
+</script>
+</html>

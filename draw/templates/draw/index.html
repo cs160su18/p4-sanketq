@@ -65,7 +65,25 @@
       users[msg.id].strokeColor = msg.text;
       console.log("User" + msg.id + "has updated their color to " + msg.text);
     }
-  
+    
+    function placePixel(x, y, rect_color){
+      var x = Math.round(x / 100) * 100;
+      var y = Math.round(y / 100) * 100;
+      var rect = new paper.Rectangle(new paper.Point(x,y),new paper.Size(100,100));
+      var rectPath = new paper.Path.Rectangle(rect);
+      rectPath.strokeColor = rect_color;
+      rectPath.fillColor = rect_color;
+      return rectPath;
+    }
+    function getSecret(x,y) {
+      return secrets["(" + x + ", " + y + ")"]
+    }
+    function setSecret(x,y,secret){
+      secrets["(" + x + ", " + y + ")"] = secret;
+    }
+    function containsSecret(x,y){
+      return secrets["(" + x + ", " + y + ")"] != null;
+    }
     // send message     
     function sendMessage(msg_type, msg_text="") {
       var msg = {
@@ -98,7 +116,12 @@
     function sendDraw(point){
       sendMessage("draw", JSON.stringify(point));
     }
+  
+    function sendPixel(point){
+      sendMessage("pixel", JSON.stringify(point));
+    }
   ////////END  HELPERS/////////
+  
   
   
     // setting up the canvas and one paper tool
@@ -124,6 +147,9 @@
   
     var users = new Object();
     users[clientID] = myPath;
+  
+    var secrets = new Object();
+    
     
     // init display size
     var display_size;
@@ -152,6 +178,30 @@
         y: event.point.y
       };
       sendDraw(point);
+    }
+    
+    tool.onMouseDown = function (event) {      
+    
+      var x = event.point.x;
+      var y = event.point.y;
+      
+      x = Math.round(x / 100) * 100;
+      y = Math.round(y / 100) * 100;
+      
+      if(containsSecret(x,y)){
+        alert(getSecret(x,y));
+      }
+      else{
+        var point = {
+          x: event.point.x,
+          y: event.point.x,
+          color: color,
+          secret: generateRandomColor()
+        };
+        setSecret(x, y, point.secret);
+        sendPixel(point);
+        placePixel(x, y, color);
+      }
     }
     
     // Device Orientation Event
@@ -232,7 +282,16 @@
                 path.add(point);
               }
             }
-            break;
+          break;
+          case "pixel":
+            if(msg.id != clientID){
+                p = JSON.parse(msg.text);
+                placePixel(p.x, p.y, p.color);
+                var x = Math.round(p.x / 100) * 100;
+                var y = Math.round(p.y / 100) * 100;
+                setPixel(x, y, p.secret);
+            }
+          break;
       }
     }
 </script>
